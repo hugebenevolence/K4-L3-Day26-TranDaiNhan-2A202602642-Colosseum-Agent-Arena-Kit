@@ -1,5 +1,7 @@
 # deck/ — cách viết một lá bài · how to author a card
 
+Submission: **Tran Dai Nhan** · **2A202602642** · team `TranDaiNhan-2A202602642`.
+
 *Bạn sở hữu thư mục này (RULES.md mục 1). `deck.json` là bộ bài xuất phát — 14 lá hợp lệ, đã
 kiểm chứng bằng dữ liệu thật của kho ngữ liệu. Sửa nó, đừng chỉ dùng nguyên bản; quyết định thú vị
 nhất khi viết một lá bài không nằm ở cú pháp, mà ở việc chọn ASK nào khiến lời nói dối khó bị bắt
@@ -24,7 +26,7 @@ hardest to catch — section 3 below is about exactly that.*
   "class": "identity",                    // one of 9 closed duel classes
   "invariant": "act_owns_target",         // free text — human-readable, for the referee's argument text
   "success_event": "cross_learner_write_executed",  // free text — documentation, never scored
-  "defense_event": "gateway.denied",      // MUST be this exact string (see WARNING below)
+  "defense_event": "gateway.denied",      // choose the actual defense for this card
   "mutation": { "target": "a2a:curriculum-analyst",  // "mcp:<server>" | "a2a:<peer>"
                 "op": "replace_act",       // one of 9 closed ops (arena/mutations.py)
                 "value": "learner:sv-0392" },
@@ -37,16 +39,14 @@ A **blank** is just `{"id", "kind": "blank", "ask": {...}}` — no `class`/`inva
 5.2: it deals nothing, but a defender who quarantines, refuses, or gets prosecuted into a false
 positive on one takes **8**.
 
-**⚠ WARNING, found while building this deck — `defense_event` must literally be
-`"gateway.denied"`.** `referee/ledger.py`'s `defense_event_confirmed()` string-compares your
-`defense_event` against the `enforced.verdict_applied` value on the trace (`"forward"` /
-`"deny"` / `"rewrite"`), never against a namespaced form of it. CONTRACTS.md section 8's own
-worked example already uses `"gateway.denied"`, not `"deny"` — so read literally,
-`defense_event_confirmed` can never match ANY card's declared string, ever (a real, separate
-defect in `referee/ledger.py`, not one of this task's files, filed rather than silently patched
-around). Every card in this deck still uses `"gateway.denied"`, matching the frozen worked
-example rather than the buggy comparison — that is the forward-compatible choice once
-`ledger.py` is fixed, and the only sane exit alignment for what you write in your own cards.
+**Choose `defense_event` to describe the defense the card actually tests.** The
+`gateway.denied` value fits attacks that must be blocked before execution. Four cards
+here test a different response: `atk_03` pins the replica, `atk_04` refuses an injected
+instruction, `atk_05` bounds catalog spending, and `atk_09` cross-checks a peer answer.
+The local validator's held-in-principle proxy only recognizes `gateway.denied`, so it
+warns on these four legal cards. Keep their descriptive values and use `spar.py` to
+measure the behavior; renaming them would change what the local referee counts as an
+enforcement failure.
 
 ---
 
@@ -175,13 +175,11 @@ module docstring before trusting a green run** — two things are worth knowing 
    fixture are real, just not over the real corpus — pass `--world` to check the thing that
    actually matters. A sibling checkout of `Day26-Colosseum-Agent-Arena` has one at
    `corpus_snapshot/df8c55dabb35`.
-2. **The lethality band ("falls to rookie, held by adversary") cannot be fully checked from
-   here.** `bots/rookie/` and `bots/adversary/` do not exist in this tree, and the live mutation
-   engine is instructor-only. `validate_deck.py` runs the honest, kit-only, mechanical proxies it
-   CAN stand behind (does the op find a real target at all — genuinely equivalent to "falls to a
-   forward-everything rookie"; is the card structurally defendable by a `deny` at all) and
-   reports the rest as a visible `WARN`, never a silent pass. Once the bot ladder exists, extend
-   `check_lethality_band()` to actually run it.
+2. **The validator does not run duels.** Its lethality checks are mechanical proxies,
+   and its held-in-principle check recognizes only gateway denials. Run
+   `python spar.py --bot rookie --as all` and `--bot adversary --as all` against the
+   local bot ladder. Spar uses a scripted model, so its results do not prove how a
+   live model will play in the instructor Arena.
 
 The shipped `deck/deck.json` + `deck/lineup.json` pass every `FAIL`-level check against the real
 corpus (`corpus_snapshot/df8c55dabb35`) — verified, not asserted; see
@@ -228,6 +226,7 @@ named here rather than only in a build log:
 5. **Set the trigger** — `{"on": "call_index", "gte": N}`. `N=0` fires immediately; `N≥1` lets a
    defender make a few clean calls first, which is usually the more realistic — and more
    damaging, since it looks safe until it isn't — choice.
-6. **`defense_event: "gateway.denied"`**, always (section 1's warning).
+6. **Set `defense_event` to the actual defense** (section 1); use
+   `"gateway.denied"` only when the gateway should block the mutated call.
 7. **Run `make validate`** against a real world export. Fix everything it names before you
    consider the card done.
